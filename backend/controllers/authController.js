@@ -2,49 +2,106 @@ import User from "../models/userModel.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
+/**
+ * ======================
+ * SIGN UP
+ * ======================
+ */
 export const signUp = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    const hashed = bcrypt.hashSync(password, 10);
+    // check user already exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ message: "User already exists" });
+    }
 
+    // hash password
+    const hashedPassword = bcrypt.hashSync(password, 10);
+
+    // username is REQUIRED in schema → auto-generate
     const user = new User({
+      username: email.split("@")[0], // ✅ FIX
       email,
-      password: hashed,
+      password: hashedPassword,
+      isUser: true,
     });
 
     await user.save();
 
-    res.status(201).json({ message: "User created" });
-  } catch (err) {
-    res.status(500).json(err);
-  }
-};
-
-export const signIn = async (req, res) => {
-  try {
-    const user = await User.findOne({ email: req.body.email });
-
-    if (!user) return res.status(404).json({ message: "user not found" });
-
-    const valid = bcrypt.compareSync(req.body.password, user.password);
-
-    if (!valid) return res.status(401).json({ message: "wrong password" });
-
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET);
-
-    res.json({
-      _id: user._id,
-      email: user.email,
-      accessToken: token,
-      isUser: true,
+    res.status(201).json({
+      success: true,
+      message: "User created successfully",
     });
   } catch (err) {
-    res.status(500).json(err);
+    console.error("Signup error:", err);
+    res.status(500).json({
+      success: false,
+      message: "Signup failed",
+    });
   }
 };
 
-// ✅ ADD THIS (IMPORTANT)
+/**
+ * ======================
+ * SIGN IN
+ * ======================
+ */
+export const signIn = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    const isPasswordCorrect = bcrypt.compareSync(
+      password,
+      user.password
+    );
+
+    if (!isPasswordCorrect) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid password",
+      });
+    }
+
+    const accessToken = jwt.sign(
+      { id: user._id },
+      process.env.JWT_SECRET,
+      { expiresIn: "1d" }
+    );
+
+    res.status(200).json({
+      success: true,
+      _id: user._id,
+      username: user.username,
+      email: user.email,
+      isUser: user.isUser,
+      isAdmin: user.isAdmin,
+      isVendor: user.isVendor,
+      accessToken,
+    });
+  } catch (err) {
+    console.error("Signin error:", err);
+    res.status(500).json({
+      success: false,
+      message: "Signin failed",
+    });
+  }
+};
+
+/**
+ * ======================
+ * REFRESH TOKEN (DUMMY – to avoid crash)
+ * ======================
+ */
 export const refreshToken = async (req, res) => {
   res.status(200).json({ message: "refresh token ok" });
 };
