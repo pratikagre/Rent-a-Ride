@@ -43,3 +43,8 @@ export const signIn = async (req, res) => {
     res.status(500).json(err);
   }
 };
+
+// ✅ ADD THIS (IMPORTANT)
+export const refreshToken = async (req, res) => {
+  res.status(200).json({ message: "refresh token ok" });
+};
